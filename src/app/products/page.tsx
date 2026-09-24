@@ -10,11 +10,13 @@ import ProductCard from "@/components/products/ProductCard";
 import Pagination from "@/components/common/Pagination";
 import SearchBar from "@/components/products/SearchBar";
 import CategoryFilter from "@/components/products/CategoryFilter";
+import SortControl from "@/components/products/SortControl";
 import { TableSkeletonRows, CardSkeletonList } from "@/components/common/LoadingState";
 import EmptyState from "@/components/common/EmptyState";
 import ErrorState from "@/components/common/ErrorState";
 import { useCategories } from "@/hooks/useCategories";
 import { parseProductQueryParams, buildQueryString } from "@/utils/url";
+import { SortField, SortOrder } from "@/types";
 
 function ProductsContent() {
   const router = useRouter();
@@ -39,7 +41,14 @@ function ProductsContent() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const updateUrlParams = (
-    updates: Partial<{ page: number; pageSize: number; search: string; category: string }>
+    updates: Partial<{
+      page: number;
+      pageSize: number;
+      search: string;
+      category: string;
+      sort: string;
+      sortOrder: string;
+    }>
   ) => {
     const qs = buildQueryString(searchParams, updates);
     startTransition(() => {
@@ -55,6 +64,11 @@ function ProductsContent() {
   const handleCategoryChange = (newCategory: string) => {
     // When category changes: reset page to 1 and update URL
     updateUrlParams({ page: 1, category: newCategory });
+  };
+
+  const handleSortChange = (newSort: SortField | "", newOrder: SortOrder) => {
+    // When sort changes: reset page to 1 and update URL
+    updateUrlParams({ page: 1, sort: newSort, sortOrder: newOrder });
   };
 
   const handlePageChange = (newPage: number) => {
@@ -104,7 +118,7 @@ function ProductsContent() {
       </div>
 
       {/* Search and Filters toolbar */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-border shadow-2xs">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-border shadow-2xs">
         <SearchBar
           value={search}
           onChange={handleSearchChange}
@@ -119,6 +133,13 @@ function ProductsContent() {
             isLoading={isCategoriesLoading}
             disabled={isLoading}
             isSearchActive={!!search.trim()}
+          />
+
+          <SortControl
+            currentSort={sort}
+            currentOrder={sortOrder}
+            onChange={handleSortChange}
+            disabled={isLoading}
           />
         </div>
       </div>
@@ -204,6 +225,9 @@ function ProductsContent() {
           <div className="hidden md:block">
             <ProductTable
               products={products}
+              currentSort={sort}
+              currentOrder={sortOrder}
+              onSortChange={handleSortChange}
               onDeleteRequest={handleDeleteRequest}
               deletingId={deletingId}
             />
