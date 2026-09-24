@@ -17,6 +17,9 @@ import ErrorState from "@/components/common/ErrorState";
 import { useCategories } from "@/hooks/useCategories";
 import { parseProductQueryParams, buildQueryString } from "@/utils/url";
 import { SortField, SortOrder } from "@/types";
+import { deleteProduct } from "@/lib/api/products";
+import { useProductStore } from "@/context/ProductContext";
+import ConfirmDeleteModal from "@/components/common/ConfirmDeleteModal";
 
 function ProductsContent() {
   const router = useRouter();
@@ -38,7 +41,14 @@ function ProductsContent() {
 
   const { categories, isLoading: isCategoriesLoading } = useCategories();
 
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const { deleteLocalProduct } = useProductStore();
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: number;
+    title: string;
+  } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const updateUrlParams = (
     updates: Partial<{
@@ -57,17 +67,14 @@ function ProductsContent() {
   };
 
   const handleSearchChange = (newSearch: string) => {
-    // When search changes: reset page to 1 and update URL
     updateUrlParams({ page: 1, search: newSearch });
   };
 
   const handleCategoryChange = (newCategory: string) => {
-    // When category changes: reset page to 1 and update URL
     updateUrlParams({ page: 1, category: newCategory });
   };
 
   const handleSortChange = (newSort: SortField | "", newOrder: SortOrder) => {
-    // When sort changes: reset page to 1 and update URL
     updateUrlParams({ page: 1, sort: newSort, sortOrder: newOrder });
   };
 
@@ -76,20 +83,77 @@ function ProductsContent() {
   };
 
   const handlePageSizeChange = (newPageSize: number) => {
-    // When changing page size, reset to page 1
     updateUrlParams({ page: 1, pageSize: newPageSize });
   };
 
   const handleDeleteRequest = (id: number, title: string) => {
-    setDeletingId(id);
-    alert(
-      `Delete requested for product #${id}: "${title}". Confirmation modal will be hooked up in deletion phase.`
-    );
-    setDeletingId(null);
+    setDeleteTarget({ id, title });
+    setDeleteError(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      // Call DummyJSON API (for local dummy created IDs like >194, endpoint may 404, handle gracefully)
+      try {
+        await deleteProduct(deleteTarget.id);
+      } catch (err: unknown) {
+        // If it's a locally created item not on server, ignore 404
+        console.warn("Server delete call returned error, proceeding with local deletion:", err);
+      }
+
+      // Remove from local context & storage
+      deleteLocalProduct(deleteTarget.id);
+
+      // Show temporary toast
+      const deletedTitle = deleteTarget.title;
+      setDeleteTarget(null);
+      setToastMessage(`Product "${deletedTitle}" was deleted successfully.`);
+      setTimeout(() => setToastMessage(null), 4000);
+
+      // Trigger refetch to update UI list
+      refetch();
+    } catch {
+      setDeleteError("Failed to delete product. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
     <div className="space-y-6">
+      {/* Delete error notification */}
+      {deleteError && (
+        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-danger text-sm font-medium flex items-center justify-between shadow-xs animate-in fade-in">
+          <span>{deleteError}</span>
+          <button
+            type="button"
+            onClick={() => setDeleteError(null)}
+            className="text-red-600 hover:text-red-900 font-bold ml-4"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
+      {/* Toast notification */}
+      {toastMessage && (
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-medium flex items-center justify-between shadow-xs animate-in fade-in slide-in-from-top-2">
+          <span>{toastMessage}</span>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="text-emerald-600 hover:text-emerald-900 font-bold ml-4"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Header section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -229,7 +293,7 @@ function ProductsContent() {
               currentOrder={sortOrder}
               onSortChange={handleSortChange}
               onDeleteRequest={handleDeleteRequest}
-              deletingId={deletingId}
+              deletingId={deleteTarget?.id ?? null}
             />
           </div>
 
@@ -240,7 +304,7 @@ function ProductsContent() {
                 key={product.id}
                 product={product}
                 onDeleteRequest={handleDeleteRequest}
-                isDeleting={deletingId === product.id}
+                isDeleting={deleteTarget?.id === product.id}
               />
             ))}
           </div>
@@ -258,6 +322,15 @@ function ProductsContent() {
           </div>
         </>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={!!deleteTarget}
+        productTitle={deleteTarget?.title || ""}
+        isDeleting={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }

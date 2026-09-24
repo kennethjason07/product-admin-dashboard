@@ -21,6 +21,9 @@ import {
   User as UserIcon,
 } from "lucide-react";
 
+import ConfirmDeleteModal from "@/components/common/ConfirmDeleteModal";
+import { deleteProduct } from "@/lib/api/products";
+
 interface ProductDetailsPageProps {
   params: Promise<{ id: string }>;
 }
@@ -35,6 +38,8 @@ export default function ProductDetailsPage({ params }: ProductDetailsPageProps) 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [notFound, setNotFound] = useState<boolean>(false);
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   const { getLocalProductById, locallyDeletedIds, deleteLocalProduct } =
     useProductStore();
@@ -103,15 +108,22 @@ export default function ProductDetailsPage({ params }: ProductDetailsPageProps) 
     };
   }, [idStr, getLocalProductById, locallyDeletedIds]);
 
-  const handleDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!product) return;
-    if (
-      window.confirm(
-        `Are you sure you want to delete "${product.title}"? This action cannot be undone.`
-      )
-    ) {
+    setIsDeleting(true);
+
+    try {
+      try {
+        await deleteProduct(product.id);
+      } catch (err: unknown) {
+        console.warn("Server delete API returned error, proceeding with local deletion:", err);
+      }
+
       deleteLocalProduct(product.id);
       router.push("/products");
+    } catch {
+      alert("Failed to delete product. Please try again.");
+      setIsDeleting(false);
     }
   };
 
@@ -217,7 +229,7 @@ export default function ProductDetailsPage({ params }: ProductDetailsPageProps) 
           </Link>
           <button
             type="button"
-            onClick={handleDelete}
+            onClick={() => setShowDeleteModal(true)}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold text-danger bg-red-50 hover:bg-red-100 transition-colors border border-red-200 cursor-pointer"
           >
             <Trash2 className="w-4 h-4" />
@@ -459,9 +471,6 @@ export default function ProductDetailsPage({ params }: ProductDetailsPageProps) 
                     <p className="text-xs font-semibold text-gray-900 truncate">
                       {rev.reviewerName}
                     </p>
-                    <p className="text-[10px] text-text-muted truncate">
-                      {rev.reviewerEmail}
-                    </p>
                   </div>
                 </div>
               </div>
@@ -469,6 +478,15 @@ export default function ProductDetailsPage({ params }: ProductDetailsPageProps) 
           </div>
         </div>
       )}
+
+      {/* Delete confirmation modal */}
+      <ConfirmDeleteModal
+        isOpen={showDeleteModal}
+        productTitle={product?.title || ""}
+        isDeleting={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setShowDeleteModal(false)}
+      />
     </div>
   );
 }
