@@ -2,8 +2,21 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Product } from "@/types";
-import { getProducts } from "@/lib/api/products";
+import {
+  getProducts,
+  searchProducts,
+  getProductsByCategory,
+} from "@/lib/api/products";
 import { useProductStore } from "@/context/ProductContext";
+
+export interface UseProductsOptions {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  category?: string;
+  sort?: string;
+  sortOrder?: "asc" | "desc";
+}
 
 interface UseProductsResult {
   products: Product[];
@@ -13,7 +26,14 @@ interface UseProductsResult {
   refetch: () => Promise<void>;
 }
 
-export function useProducts(limit: number = 20, skip: number = 0): UseProductsResult {
+export function useProducts({
+  page = 1,
+  pageSize = 20,
+  search = "",
+  category = "",
+  sort = "",
+  sortOrder = "asc",
+}: UseProductsOptions = {}): UseProductsResult {
   const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -28,8 +48,16 @@ export function useProducts(limit: number = 20, skip: number = 0): UseProductsRe
     setReloadTrigger((c) => c + 1);
   }, []);
 
+  const skip = (Math.max(1, page) - 1) * pageSize;
+
   useEffect(() => {
     let ignore = false;
+
+    // Abort previous pending request to guarantee race-condition safety
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -39,11 +67,36 @@ export function useProducts(limit: number = 20, skip: number = 0): UseProductsRe
       setError(null);
 
       try {
-        const response = await getProducts({
-          limit,
-          skip,
-          signal: controller.signal,
-        });
+        let response;
+
+        if (search.trim()) {
+          // DummyJSON search endpoint
+          response = await searchProducts(search.trim(), {
+            limit: pageSize,
+            skip,
+            sortBy: sort || undefined,
+            order: sortOrder,
+            signal: controller.signal,
+          });
+        } else if (category.trim()) {
+          // DummyJSON category endpoint
+          response = await getProductsByCategory(category.trim(), {
+            limit: pageSize,
+            skip,
+            sortBy: sort || undefined,
+            order: sortOrder,
+            signal: controller.signal,
+          });
+        } else {
+          // Standard product list endpoint
+          response = await getProducts({
+            limit: pageSize,
+            skip,
+            sortBy: sort || undefined,
+            order: sortOrder,
+            signal: controller.signal,
+          });
+        }
 
         if (!ignore) {
           setRawProducts(response.products);
@@ -52,10 +105,17 @@ export function useProducts(limit: number = 20, skip: number = 0): UseProductsRe
       } catch (err: unknown) {
         if (!ignore) {
           const errorObj = err as { name?: string; message?: string };
-          if (errorObj?.name === "CanceledError" || errorObj?.name === "AbortError") {
+          // Ignore cancelled or aborted requests
+          if (
+            errorObj?.name === "CanceledError" ||
+            errorObj?.name === "AbortError"
+          ) {
             return;
           }
-          setError(errorObj?.message || "Failed to load products. Please check your network connection.");
+          setError(
+            errorObj?.message ||
+              "Failed to load products. Please check your network connection."
+          );
         }
       } finally {
         if (!ignore) {
@@ -68,7 +128,7 @@ export function useProducts(limit: number = 20, skip: number = 0): UseProductsRe
       ignore = true;
       controller.abort();
     };
-  }, [limit, skip, reloadTrigger]);
+  }, [page, pageSize, skip, search, category, sort, sortOrder, reloadTrigger]);
 
   // Apply simulated local mutations (added, edited, deleted products)
   const products = applyLocalOverrides(rawProducts);

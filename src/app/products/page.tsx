@@ -1,23 +1,61 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Package } from "lucide-react";
 import { useProducts } from "@/hooks/useProducts";
 import ProductTable from "@/components/products/ProductTable";
 import ProductCard from "@/components/products/ProductCard";
+import Pagination from "@/components/common/Pagination";
 import { TableSkeletonRows, CardSkeletonList } from "@/components/common/LoadingState";
 import EmptyState from "@/components/common/EmptyState";
 import ErrorState from "@/components/common/ErrorState";
+import { parseProductQueryParams, buildQueryString } from "@/utils/url";
 
-export default function ProductsPage() {
-  const { products, total, isLoading, error, refetch } = useProducts(20, 0);
+function ProductsContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [, startTransition] = useTransition();
+
+  // Parse URL state safely
+  const { page, pageSize, search, category, sort, sortOrder } =
+    parseProductQueryParams(searchParams);
+
+  const { products, total, isLoading, error, refetch } = useProducts({
+    page,
+    pageSize,
+    search,
+    category,
+    sort,
+    sortOrder,
+  });
+
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
+  const updateUrlParams = (
+    updates: Partial<{ page: number; pageSize: number }>
+  ) => {
+    const qs = buildQueryString(searchParams, updates);
+    startTransition(() => {
+      router.push(`/products${qs}`);
+    });
+  };
+
+  const handlePageChange = (newPage: number) => {
+    updateUrlParams({ page: newPage });
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    // When changing page size, reset to page 1
+    updateUrlParams({ page: 1, pageSize: newPageSize });
+  };
+
   const handleDeleteRequest = (id: number, title: string) => {
-    // Delete dialog will be hooked up in Phase 12
     setDeletingId(id);
-    alert(`Delete requested for product #${id}: "${title}". Confirmation modal will be hooked up in deletion phase.`);
+    alert(
+      `Delete requested for product #${id}: "${title}". Confirmation modal will be hooked up in deletion phase.`
+    );
     setDeletingId(null);
   };
 
@@ -77,14 +115,14 @@ export default function ProductsPage() {
                 </tr>
               </thead>
               <tbody>
-                <TableSkeletonRows count={8} />
+                <TableSkeletonRows count={pageSize > 10 ? 10 : pageSize} />
               </tbody>
             </table>
           </div>
 
           {/* Mobile Skeleton */}
           <div className="md:hidden">
-            <CardSkeletonList count={6} />
+            <CardSkeletonList count={4} />
           </div>
         </>
       )}
@@ -93,7 +131,7 @@ export default function ProductsPage() {
       {!isLoading && !error && products.length === 0 && (
         <EmptyState
           title="No products available"
-          description="There are currently no products in the catalog."
+          description="There are currently no products matching this view."
           actionLabel="Refresh list"
           onAction={refetch}
           icon={<Package className="w-8 h-8" />}
@@ -123,8 +161,35 @@ export default function ProductsPage() {
               />
             ))}
           </div>
+
+          {/* Pagination */}
+          <div className="pt-2">
+            <Pagination
+              currentPage={page}
+              pageSize={pageSize}
+              totalItems={total}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+              disabled={isLoading}
+            />
+          </div>
         </>
       )}
     </div>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-6">
+          <div className="h-10 bg-gray-200 rounded w-1/4 animate-pulse" />
+          <div className="bg-white rounded-2xl border border-border p-8 animate-pulse h-96" />
+        </div>
+      }
+    >
+      <ProductsContent />
+    </Suspense>
   );
 }
