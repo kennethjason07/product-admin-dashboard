@@ -9,9 +9,11 @@ import ProductTable from "@/components/products/ProductTable";
 import ProductCard from "@/components/products/ProductCard";
 import Pagination from "@/components/common/Pagination";
 import SearchBar from "@/components/products/SearchBar";
+import CategoryFilter from "@/components/products/CategoryFilter";
 import { TableSkeletonRows, CardSkeletonList } from "@/components/common/LoadingState";
 import EmptyState from "@/components/common/EmptyState";
 import ErrorState from "@/components/common/ErrorState";
+import { useCategories } from "@/hooks/useCategories";
 import { parseProductQueryParams, buildQueryString } from "@/utils/url";
 
 function ProductsContent() {
@@ -32,6 +34,8 @@ function ProductsContent() {
     sortOrder,
   });
 
+  const { categories, isLoading: isCategoriesLoading } = useCategories();
+
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const updateUrlParams = (
@@ -46,6 +50,11 @@ function ProductsContent() {
   const handleSearchChange = (newSearch: string) => {
     // When search changes: reset page to 1 and update URL
     updateUrlParams({ page: 1, search: newSearch });
+  };
+
+  const handleCategoryChange = (newCategory: string) => {
+    // When category changes: reset page to 1 and update URL
+    updateUrlParams({ page: 1, category: newCategory });
   };
 
   const handlePageChange = (newPage: number) => {
@@ -95,12 +104,23 @@ function ProductsContent() {
       </div>
 
       {/* Search and Filters toolbar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-border shadow-2xs">
         <SearchBar
           value={search}
           onChange={handleSearchChange}
           disabled={isLoading}
         />
+
+        <div className="flex flex-wrap items-center gap-3">
+          <CategoryFilter
+            categories={categories}
+            selectedCategory={category}
+            onChange={handleCategoryChange}
+            isLoading={isCategoriesLoading}
+            disabled={isLoading}
+            isSearchActive={!!search.trim()}
+          />
+        </div>
       </div>
 
       {/* Error state */}
@@ -145,14 +165,34 @@ function ProductsContent() {
       {/* Empty state */}
       {!isLoading && !error && products.length === 0 && (
         <EmptyState
-          title={search ? `No products found for "${search}"` : "No products available"}
+          title={
+            search
+              ? `No products found for "${search}"`
+              : category
+              ? `No products in category "${category}"`
+              : "No products available"
+          }
           description={
             search
               ? "We couldn't find any products matching your search query. Try checking for typos or searching with different keywords."
+              : category
+              ? "There are currently no products available in this category. Try picking another category."
               : "There are currently no products matching this view."
           }
-          actionLabel={search ? "Clear search" : "Refresh list"}
-          onAction={search ? () => handleSearchChange("") : refetch}
+          actionLabel={
+            search
+              ? "Clear search"
+              : category
+              ? "Clear category"
+              : "Refresh list"
+          }
+          onAction={
+            search
+              ? () => handleSearchChange("")
+              : category
+              ? () => handleCategoryChange("")
+              : refetch
+          }
           icon={<Package className="w-8 h-8" />}
         />
       )}
