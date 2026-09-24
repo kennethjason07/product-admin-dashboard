@@ -8,6 +8,7 @@ import { useProducts } from "@/hooks/useProducts";
 import ProductTable from "@/components/products/ProductTable";
 import ProductCard from "@/components/products/ProductCard";
 import Pagination from "@/components/common/Pagination";
+import SearchBar from "@/components/products/SearchBar";
 import { TableSkeletonRows, CardSkeletonList } from "@/components/common/LoadingState";
 import EmptyState from "@/components/common/EmptyState";
 import ErrorState from "@/components/common/ErrorState";
@@ -34,12 +35,17 @@ function ProductsContent() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const updateUrlParams = (
-    updates: Partial<{ page: number; pageSize: number }>
+    updates: Partial<{ page: number; pageSize: number; search: string; category: string }>
   ) => {
     const qs = buildQueryString(searchParams, updates);
     startTransition(() => {
       router.push(`/products${qs}`);
     });
+  };
+
+  const handleSearchChange = (newSearch: string) => {
+    // When search changes: reset page to 1 and update URL
+    updateUrlParams({ page: 1, search: newSearch });
   };
 
   const handlePageChange = (newPage: number) => {
@@ -88,6 +94,15 @@ function ProductsContent() {
         </div>
       </div>
 
+      {/* Search and Filters toolbar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <SearchBar
+          value={search}
+          onChange={handleSearchChange}
+          disabled={isLoading}
+        />
+      </div>
+
       {/* Error state */}
       {error && !isLoading && (
         <ErrorState
@@ -130,10 +145,14 @@ function ProductsContent() {
       {/* Empty state */}
       {!isLoading && !error && products.length === 0 && (
         <EmptyState
-          title="No products available"
-          description="There are currently no products matching this view."
-          actionLabel="Refresh list"
-          onAction={refetch}
+          title={search ? `No products found for "${search}"` : "No products available"}
+          description={
+            search
+              ? "We couldn't find any products matching your search query. Try checking for typos or searching with different keywords."
+              : "There are currently no products matching this view."
+          }
+          actionLabel={search ? "Clear search" : "Refresh list"}
+          onAction={search ? () => handleSearchChange("") : refetch}
           icon={<Package className="w-8 h-8" />}
         />
       )}
