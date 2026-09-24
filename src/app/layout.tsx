@@ -14,6 +14,8 @@ export const metadata: Metadata = {
     "A production-quality admin dashboard for managing products, built with Next.js, TypeScript, and Tailwind CSS.",
 };
 
+import { AuthProvider } from "@/context/AuthContext";
+
 export default function RootLayout({
   children,
 }: {
@@ -22,7 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} h-full`}>
       <body className="min-h-full flex flex-col font-sans antialiased">
-        {children}
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

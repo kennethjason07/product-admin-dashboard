@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Package, Menu, X } from "lucide-react";
+import { Package, Menu, X, LogOut, User as UserIcon } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Header() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   const isActive = (path: string) => pathname.startsWith(path);
 
@@ -29,7 +32,7 @@ export default function Header() {
             <Link
               href="/products"
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                isActive("/products")
+                isActive("/products") && pathname !== "/products/new"
                   ? "bg-primary-light text-primary"
                   : "text-text-secondary hover:text-primary hover:bg-gray-50"
               }`}
@@ -44,11 +47,41 @@ export default function Header() {
             </Link>
           </nav>
 
-          {/* User area — placeholder for logout (Phase 2) */}
-          <div className="hidden md:flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-primary-light text-primary flex items-center justify-center text-sm font-semibold">
-              U
-            </div>
+          {/* User area & Logout */}
+          <div className="hidden md:flex items-center gap-4">
+            {user && (
+              <div className="flex items-center gap-2.5">
+                {user.image ? (
+                  <Image
+                    src={user.image}
+                    alt={`${user.firstName} ${user.lastName}`}
+                    width={32}
+                    height={32}
+                    className="w-8 h-8 rounded-full border border-border object-cover"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-primary-light text-primary flex items-center justify-center text-xs font-semibold">
+                    <UserIcon className="w-4 h-4" />
+                  </div>
+                )}
+                <div className="text-left">
+                  <p className="text-xs font-semibold text-gray-900 leading-tight">
+                    {user.firstName} {user.lastName}
+                  </p>
+                  <p className="text-[11px] text-text-muted leading-tight">
+                    @{user.username}
+                  </p>
+                </div>
+              </div>
+            )}
+            <button
+              onClick={logout}
+              title="Sign out"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-secondary hover:text-danger hover:bg-red-50 border border-border transition-colors cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign out</span>
+            </button>
           </div>
 
           {/* Mobile menu toggle */}
@@ -68,27 +101,58 @@ export default function Header() {
 
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <nav className="md:hidden border-t border-border bg-white">
-          <div className="px-4 py-3 space-y-1">
-            <Link
-              href="/products"
-              onClick={() => setMobileMenuOpen(false)}
-              className={`block px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                isActive("/products")
-                  ? "bg-primary-light text-primary"
-                  : "text-text-secondary hover:bg-gray-50"
-              }`}
-            >
-              Products
-            </Link>
-            <Link
-              href="/products/new"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block px-4 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary-hover transition-colors text-center"
-            >
-              + Add Product
-            </Link>
-          </div>
+        <nav className="md:hidden border-t border-border bg-white px-4 py-3 space-y-2">
+          {user && (
+            <div className="flex items-center gap-3 px-3 py-2 bg-gray-50 rounded-lg">
+              {user.image ? (
+                <Image
+                  src={user.image}
+                  alt={`${user.firstName} ${user.lastName}`}
+                  width={36}
+                  height={36}
+                  className="w-9 h-9 rounded-full border border-border object-cover"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-primary-light text-primary flex items-center justify-center text-sm font-semibold">
+                  <UserIcon className="w-5 h-5" />
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {user.firstName} {user.lastName}
+                </p>
+                <p className="text-xs text-text-muted">@{user.username}</p>
+              </div>
+            </div>
+          )}
+          <Link
+            href="/products"
+            onClick={() => setMobileMenuOpen(false)}
+            className={`block px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              isActive("/products") && pathname !== "/products/new"
+                ? "bg-primary-light text-primary"
+                : "text-text-secondary hover:bg-gray-50"
+            }`}
+          >
+            Products
+          </Link>
+          <Link
+            href="/products/new"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block px-4 py-2.5 rounded-lg text-sm font-medium bg-primary text-white hover:bg-primary-hover transition-colors text-center"
+          >
+            + Add Product
+          </Link>
+          <button
+            onClick={() => {
+              setMobileMenuOpen(false);
+              logout();
+            }}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium text-danger hover:bg-red-50 transition-colors border border-red-200"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Sign out</span>
+          </button>
         </nav>
       )}
     </header>
